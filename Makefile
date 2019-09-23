@@ -5,7 +5,7 @@ GIT_VERSION := $(shell git describe --abbrev=8 --dirty --always --tags)
 
 # Config bits
 BOOTLOADER_SIZE = 4
-FLASH_SIZE = 128
+FLASH_SIZE = 64
 FLASH_BASE_ADDR = 0x08000000
 FLASH_BOOTLDR_PAYLOAD_SIZE_KB = $(shell echo $$(($(FLASH_SIZE) - $(BOOTLOADER_SIZE))))
 
@@ -48,3 +48,13 @@ flash_config.h:
 clean:
 	-rm -f *.elf *.o *.bin *.map flash_config.h
 
+
+bootloader-dfu-fw.cfg:
+	@echo "Creating opencod configuration file"
+	echo "interface jlink" >> $@
+	echo "transport select swd" >> $@
+	echo "source [find target/stm32f1x.cfg]" >> $@
+	echo "adapter_khz 4000" >> $@
+#use winusb driver
+program: bootloader-dfu-fw.elf bootloader-dfu-fw.cfg
+	openocd -f bootloader-dfu-fw.cfg -c "program bootloader-dfu-fw.elf verify reset exit"
