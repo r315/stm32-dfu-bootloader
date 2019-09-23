@@ -395,13 +395,19 @@ int main(void) {
 	uint32_t imagesize = 0;
 	#endif
 
-	int go_dfu = rebooted_into_dfu() ||
-	#ifdef ENABLE_WATCHDOG
-	             reset_due_to_watchdog() ||
-	#endif
-	             imagesize > FLASH_BOOTLDR_PAYLOAD_SIZE_KB*1024/4 ||
-	             force_dfu_gpio();
-	             
+	int go_dfu = 0;
+	if(rebooted_into_dfu()){
+		clear_reboot_flags();
+		go_dfu = 1;
+	}else{
+		go_dfu = 
+		#ifdef ENABLE_WATCHDOG
+	    	reset_due_to_watchdog() ||
+		#endif
+	    	(imagesize > FLASH_BOOTLDR_PAYLOAD_SIZE_KB*1024/4) ||
+			force_dfu_gpio();
+	}
+	       
 	if (!go_dfu && 
 	   (*(volatile uint32_t *)APP_ADDRESS & 0x2FFE0000) == 0x20000000) {
 
