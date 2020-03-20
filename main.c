@@ -28,7 +28,7 @@
 #define CMD_ERASE	0x41
 
 // Payload/app comes inmediately after Bootloader
-#define APP_ADDRESS (FLASH_BASE_ADDR + (FLASH_BOOTLDR_SIZE_KB)*1024)
+#define APP_ADDRESS (FLASH_BASE_ADDR + (FLASH_BOOTLDR_SIZE_KB) * 1024)
 
 // USB control data buffer
 uint8_t usbd_control_buffer[DFU_TRANSFER_SIZE];
@@ -312,6 +312,7 @@ int force_dfu_gpio() {
 #define RCC_CFGR_PPRE1_HCLK_DIV2        0x4
 #define RCC_CFGR_PPRE2_HCLK_NODIV       0x0
 #define RCC_CFGR_ADCPRE_PCLK2_DIV8      0x3
+#define RCC_CFGR_PLLMUL_PLL_CLK_MUL6    0x4
 #define RCC_CFGR_PLLMUL_PLL_CLK_MUL9    0x7
 #define RCC_CFGR_PLLSRC_HSE_CLK         0x1
 #define RCC_CFGR_PLLXTPRE_HSE_CLK       0x0
@@ -326,7 +327,7 @@ int force_dfu_gpio() {
 #define RCC_CR       (*(volatile uint32_t*)0x40021000U)
 #define RCC_CFGR     (*(volatile uint32_t*)0x40021004U)
 
-static void clock_setup_in_hse_8mhz_out_72mhz() {
+static void clock_setup_72mhz_from_hse() {
 	// No need to use HSI or HSE while setting up the PLL, just use the RC osc.
 
 	/* Enable external high-speed oscillator 8MHz. */
@@ -339,9 +340,13 @@ static void clock_setup_in_hse_8mhz_out_72mhz() {
 	 */
 	uint32_t reg32 = RCC_CFGR & 0xFFC0000F;
 	reg32 |= (RCC_CFGR_HPRE_SYSCLK_NODIV << 4) | (RCC_CFGR_PPRE1_HCLK_DIV2 << 8) |
-	         (RCC_CFGR_PPRE2_HCLK_NODIV << 11) | (RCC_CFGR_ADCPRE_PCLK2_DIV8 << 14) |
-	         (RCC_CFGR_PLLMUL_PLL_CLK_MUL9 << 18) | (RCC_CFGR_PLLSRC_HSE_CLK << 16) |
-	         (RCC_CFGR_PLLXTPRE_HSE_CLK << 17);
+	        (RCC_CFGR_PPRE2_HCLK_NODIV << 11) | (RCC_CFGR_ADCPRE_PCLK2_DIV8 << 14) |
+			#ifdef HSE12MHZ
+			(RCC_CFGR_PLLMUL_PLL_CLK_MUL6 << 18) |
+			#else
+	        (RCC_CFGR_PLLMUL_PLL_CLK_MUL9 << 18) |
+			#endif
+			(RCC_CFGR_PLLSRC_HSE_CLK << 16) | (RCC_CFGR_PLLXTPRE_HSE_CLK << 17);
 	RCC_CFGR = reg32;
 
 	// 0WS from 0-24MHz
@@ -386,8 +391,7 @@ int main(void) {
 	*_AFIO_MAPR = (*_AFIO_MAPR & ~(0x7 << 24)) | (0x4 << 24);
 	#endif
 
-	const uint32_t start_addr = 0x08000000 + (FLASH_BOOTLDR_SIZE_KB*1024);
-	const uint32_t * const base_addr = (uint32_t*)start_addr;
+	const uint32_t *const base_addr = (uint32_t*)APP_ADDRESS;
 
 	#ifdef ENABLE_CHECKSUM
 	uint32_t imagesize = base_addr[0x20 / 4];
@@ -404,7 +408,7 @@ int main(void) {
 		#ifdef ENABLE_WATCHDOG
 	    	reset_due_to_watchdog() ||
 		#endif
-	    	(imagesize > FLASH_BOOTLDR_PAYLOAD_SIZE_KB*1024/4) ||
+	    	(imagesize > FLASH_BOOTLDR_PAYLOAD_SIZE_KB * (1024/4)) ||
 			force_dfu_gpio();
 	}
 	       
@@ -413,7 +417,7 @@ int main(void) {
 
 		// Do some simple XOR checking
 		uint32_t xorv = 0;
-		for (unsigned i = 0; i < imagesize; i++)
+		for (uint32_t i = 0; i < imagesize; i++)
 			xorv ^= base_addr[i];
 
 		if (xorv == 0) {  // Matches!
@@ -434,7 +438,7 @@ int main(void) {
 		}
 	}
 
-	clock_setup_in_hse_8mhz_out_72mhz();
+	clock_setup_72mhz_from_hse();
 
 	/* Disable USB peripheral as it overrides GPIO settings */
 	*USB_CNTR_REG = USB_CNTR_PWDN;

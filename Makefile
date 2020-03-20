@@ -47,14 +47,3 @@ flash_config.h:
 
 clean:
 	-rm -f *.elf *.o *.bin *.map flash_config.h
-
-
-bootloader-dfu-fw.cfg:
-	@echo "Creating opencod configuration file"
-	echo "interface jlink" >> $@
-	echo "transport select swd" >> $@
-	echo "source [find target/stm32f1x.cfg]" >> $@
-	echo "adapter_khz 4000" >> $@
-#use winusb driver
-program: bootloader-dfu-fw.elf bootloader-dfu-fw.cfg
-	openocd -f bootloader-dfu-fw.cfg -c "program bootloader-dfu-fw.elf verify reset exit"
