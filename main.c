@@ -22,6 +22,7 @@
 #include "reboot.h"
 #include "flash.h"
 #include "watchdog.h"
+#include "regs.h"
 
 /* Commands sent with wBlockNum == 0 as per ST implementation. */
 #define CMD_SETADDR	0x21
@@ -108,9 +109,6 @@ static void _full_system_reset() {
 	__builtin_unreachable();
 }
 
-// GPIO/RCC stuff
-
-#define RCC_APB2ENR  (*(volatile uint32_t*)0x40021018U)
 
 #define rcc_gpio_enable(gpion) \
 	RCC_APB2ENR |= (1 << (gpion + 2));
@@ -257,28 +255,12 @@ usbdfu_control_request(struct usb_setup_data *req,
 	return USBD_REQ_NEXT_CALLBACK;
 }
 
-#define GPIOA 0
-#define GPIOB 1
-#define GPIOC 2
-#define GPIOD 3
-#define GPIOE 4
-#define GPIOF 5
-
-#define GPIO_CRL(x)  *((volatile uint32_t*)(x*0x400 +  0 + 0x40010800U))
-#define GPIO_CRH(x)  *((volatile uint32_t*)(x*0x400 +  4 + 0x40010800U))
-#define GPIO_IDR(x)  *((volatile uint32_t*)(x*0x400 +  8 + 0x40010800U))
-#define GPIO_BSRR(x) *((volatile uint32_t*)(x*0x400 + 16 + 0x40010800U))
-
 inline static void gpio_set_mode(uint32_t gpiodev, uint16_t gpion, uint8_t mode) {
 	if (gpion < 8)
 		GPIO_CRL(gpiodev) = (GPIO_CRL(gpiodev) & ~(0xf << ((gpion)<<2))) | (mode << ((gpion)<<2));
 	else
 		GPIO_CRH(gpiodev) = (GPIO_CRL(gpiodev) & ~(0xf << ((gpion-8)<<2))) | (mode << ((gpion-8)<<2));
 }
-
-#define gpio_set_output(a,b)    gpio_set_mode(a,b,0x2)
-#define gpio_set_input(a,b)     gpio_set_mode(a,b,0x0)
-#define gpio_set_input_pp(a,b)  gpio_set_mode(a,b,0x8)
 
 #define gpio_clear(gpiodev, gpion) \
 	GPIO_BSRR(gpiodev) = (1 << (16 + gpion))
@@ -303,29 +285,6 @@ int force_dfu_gpio() {
 #else
 #define force_dfu_gpio()  (0)
 #endif
-
-#define FLASH_ACR_LATENCY         7
-#define FLASH_ACR_LATENCY_2WS  0x02
-#define FLASH_ACR (*(volatile uint32_t*)0x40022000U)
-
-#define RCC_CFGR_HPRE_SYSCLK_NODIV      0x0
-#define RCC_CFGR_PPRE1_HCLK_DIV2        0x4
-#define RCC_CFGR_PPRE2_HCLK_NODIV       0x0
-#define RCC_CFGR_ADCPRE_PCLK2_DIV8      0x3
-#define RCC_CFGR_PLLMUL_PLL_CLK_MUL6    0x4
-#define RCC_CFGR_PLLMUL_PLL_CLK_MUL9    0x7
-#define RCC_CFGR_PLLSRC_HSE_CLK         0x1
-#define RCC_CFGR_PLLXTPRE_HSE_CLK       0x0
-#define RCC_CFGR_SW_SYSCLKSEL_PLLCLK    0x2
-#define RCC_CFGR_SW_SHIFT                 0
-#define RCC_CFGR_SW (3 << RCC_CFGR_SW_SHIFT)
-
-#define RCC_CR_HSEON    (1 << 16)
-#define RCC_CR_HSERDY   (1 << 17)
-#define RCC_CR_PLLON    (1 << 24)
-#define RCC_CR_PLLRDY   (1 << 25)
-#define RCC_CR       (*(volatile uint32_t*)0x40021000U)
-#define RCC_CFGR     (*(volatile uint32_t*)0x40021004U)
 
 static void clock_setup_72mhz_from_hse() {
 	// No need to use HSI or HSE while setting up the PLL, just use the RC osc.
