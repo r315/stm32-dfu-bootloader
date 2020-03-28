@@ -282,6 +282,9 @@ int force_dfu_gpio() {
 	gpio_set_input(GPIO_DFU_BOOT_PORT, GPIO_DFU_BOOT_PIN);	
 	return val == 0;
 }
+#elif ENABLE_CUSTOM_DFU_BOOT
+#include "dfu_boot.h"
+int force_dfu_gpio();
 #else
 #define force_dfu_gpio()  (0)
 #endif
