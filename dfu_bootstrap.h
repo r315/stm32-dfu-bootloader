@@ -1,9 +1,6 @@
 #ifndef _dfu_bootstrap_h_
 #define _dfu_bootstrap_h_
 
-#include <stdint.h>
-#include "regs.h"
-
 #ifdef ENABLE_CUSTOM_DFU_BOOT
 #define HW_SW_AUX1_PIN          14
 #define HW_SW_AUX2_PIN          15
@@ -13,7 +10,7 @@
 #define HW_SW_AUX3_PORT         GPIOB
 
 static int force_dfu_gpio(){
-unsigned int val, i;
+    unsigned int val, i;
     /* Enable port */
     gpio_periph_enable(HW_SW_AUX1_PORT);
     gpio_periph_enable(HW_SW_AUX3_PORT);

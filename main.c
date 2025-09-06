@@ -303,6 +303,8 @@ int force_dfu_gpio(void) {
     gpio_set_input(GPIO_DFU_BOOT_PORT, GPIO_DFU_BOOT_PIN);
     return val == 0;
 }
+#elif defined(ENABLE_CUSTOM_DFU_BOOT)
+#include "dfu_bootstrap.h"
 #else
 __attribute__ ((weak)) int force_dfu_gpio(void){ return 0; }
 #endif
