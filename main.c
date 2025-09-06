@@ -75,6 +75,20 @@ const char * const _usb_strings[5] = {
     #endif
 };
 
+static void gpio_set_mode(uint32_t gpio, uint16_t pin, uint32_t mode) {
+    uint8_t shift = (pin & 7) << 2; // shift = pin % 8 * 4
+    uint32_t mask = (15 << shift);
+    uint32_t reg_value;
+    volatile uint32_t* reg_base = GPIO_BASE + (gpio * GPIO_SIZE);
+
+    if (pin > 7){
+        reg_base += 1;
+    }
+
+    reg_value = *reg_base & ~mask;
+    *reg_base = reg_value | (mode << shift);
+}
+
 // Clears reboot information so we reboot in "normal" mode
 static void reboot_clear_flags(void) {
 	*(volatile uint64_t*)&_magic = 0;
@@ -100,6 +114,23 @@ static void get_dev_unique_id(char *s) {
         s[i]   = hcharset[(*unique_id >> 4) & 0xF];
         s[i+1] = hcharset[*unique_id++ & 0xF];
     }
+}
+
+static void usbdfu_unplug(void){
+    /* Disable USB peripheral as it overrides GPIO settings */
+    *USB_CNTR_REG = USB_CNTR_PWDN;
+
+    /*
+     * Vile hack to reenumerate, physically _drag_ d+ low.
+     * (need at least 2.5us to trigger usb disconnect)
+     */
+    gpio_set_output(GPIOA, 12);
+    gpio_clear(GPIOA, 12);
+    for (unsigned int i = 0; i < 100000; i++)
+        __asm__("nop");
+
+    gpio_set_input(GPIOA, 11);
+    gpio_set_input(GPIOA, 12);
 }
 
 static uint8_t usbdfu_getstatus(uint32_t *bwPollTimeout) {
@@ -260,21 +291,6 @@ usbdfu_control_request(struct usb_setup_data *req,
     return USBD_REQ_NEXT_CALLBACK;
 }
 
-static void gpio_set_mode(uint32_t gpio, uint16_t pin, uint32_t mode) {
-    uint8_t shift = (pin & 7) << 2; // shift = pin % 8 * 4
-    uint32_t mask = (15 << shift);
-    uint32_t reg_value;
-    volatile uint32_t* reg_base = GPIO_BASE + (gpio * GPIO_SIZE);
-
-    if (pin > 7){
-        reg_base += 1;
-    }
-
-    reg_value = *reg_base & ~mask;
-    *reg_base = reg_value | (mode << shift);
-}
-
-
 #if defined(GPIO_DFU_BOOT_PORT) && defined(GPIO_DFU_BOOT_PIN)
 int force_dfu_gpio(void) {
     gpio_periph_enable(GPIO_DFU_BOOT_PORT);
@@ -357,6 +373,8 @@ int main(void) {
         // Now write a pair of bytes that are complentary [RDP, nRDP]
         _flash_program_option_bytes(0x1FFFF800U, 0x33CC);
 
+        usbdfu_unplug();
+
         // Now reset, for RDP to take effect. We should not re-enter this path
         _full_system_reset();
     }
@@ -422,16 +440,7 @@ int main(void) {
 
     clock_setup_72mhz_from_hse();
 
-    /* Disable USB peripheral as it overrides GPIO settings */
-    *USB_CNTR_REG = USB_CNTR_PWDN;
-    /*
-     * Vile hack to reenumerate, physically _drag_ d+ low.
-     * (need at least 2.5us to trigger usb disconnect)
-     */
-    gpio_set_output(GPIOA, 12);
-    gpio_clear(GPIOA, 12);
-    for (unsigned int i = 0; i < 100000; i++)
-        __asm__("nop");
+    usbdfu_unplug();
 
     gpio_set_af(GPIOA, 11);
     gpio_set_af(GPIOA, 12);
@@ -444,6 +453,7 @@ int main(void) {
         // Poll based approach
         do_usb_poll();
         if (usbdfu_state == STATE_DFU_MANIFEST) {
+            usbdfu_unplug();
             // USB device must detach, we just reset...
             _full_system_reset();
         }
