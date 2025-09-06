@@ -3,7 +3,7 @@
 // to make it simpler and fit 4KB
 
 #include <string.h>
-
+#include "regs.h"
 #include "usb.h"
 
 // Defined in main
@@ -13,14 +13,6 @@ extern enum usbd_request_return_codes
 usbdfu_control_request(struct usb_setup_data *req,
 		uint16_t *len, void (**complete)(struct usb_setup_data *req));
 
-// Simple builtin fns
-size_t strlen(const char *s) {
-	size_t ret = 0;
-	while (*s++)
-		ret++;
-	return ret;
-}
-
 const struct usb_device_descriptor dev_desc = {
 	.bLength = USB_DT_DEVICE_SIZE,
 	.bDescriptorType = USB_DT_DEVICE,
@@ -29,8 +21,13 @@ const struct usb_device_descriptor dev_desc = {
 	.bDeviceSubClass = 0,
 	.bDeviceProtocol = 0,
 	.bMaxPacketSize0 = 64,
-	.idVendor = 0xdead,
-	.idProduct = 0xca5d,
+#if defined(CUSTOM_VID) && defined(CUSTOM_PID)
+    .idVendor = CUSTOM_VID,  // 0xdead,
+    .idProduct = CUSTOM_PID, // 0xca5d,
+#else
+    .idVendor = 0x0483,
+    .idProduct = 0xdf11,
+#endif
 	.bcdDevice = 0x0200,
 	.iManufacturer = 1,
 	.iProduct = 2,
@@ -88,13 +85,9 @@ struct usb_setup_data usb_req;
 uint8_t usb_force_nak[8] = {0};
 void (*usb_complete_cb)(struct usb_setup_data *req) = 0;
 
-#define RCC_APB1ENR  (*(volatile uint32_t*)0x4002101CU)
-#define RCC_USB   23
-
-#define rcc_periph_enable(pn) RCC_APB1ENR |= (1 << (pn));
 
 void usb_init() {
-	rcc_periph_enable(RCC_USB);
+	usb_periph_enable(RCC_USB);
 	SET_REG(USB_CNTR_REG, 0);
 	SET_REG(USB_BTABLE_REG, 0);
 	SET_REG(USB_ISTR_REG, 0);
@@ -197,7 +190,7 @@ uint8_t _ep_stall_get(uint8_t addr) {
 	return 0;
 }
 
-static inline void _stall_transaction() {
+static void _stall_transaction() {
 	_ep_stall_set(0, 1);
 	usb_fsm_state = IDLE;
 }
@@ -236,7 +229,7 @@ static int usb_control_recv_chunk() {
 }
 
 static enum usbd_request_return_codes usb_standard_get_descriptor() {
-	int array_idx, descr_idx, descr_type;
+	uint16_t array_idx, descr_idx, descr_type;
 	struct usb_string_descriptor *sd = (struct usb_string_descriptor *)usbd_control_buffer;
 
 	descr_idx = usb_req.wValue & 0xFF;
@@ -272,11 +265,14 @@ static enum usbd_request_return_codes usb_standard_get_descriptor() {
 			/* This string is returned as UTF16, hence the
 			 * multiplication
 			 */
-			unsigned numchars = strlen(_usb_strings[array_idx]);
+			const char *strln = _usb_strings[array_idx];
+			uint16_t numchars = 0;
+			while (*strln++) numchars++;
+
 			datasize = sd->bLength = numchars * 2 +
 			          sizeof(sd->bLength) + sizeof(sd->bDescriptorType);
 
-			for (int i = 0; i < numchars; i++)
+			for (uint16_t i = 0; i < numchars; i++)
 				sd->wData[i] = _usb_strings[array_idx][i];
 		}
 		return USBD_REQ_HANDLED;

@@ -22,7 +22,7 @@ MEMORY
 {
 	rom (rx) : ORIGIN = 0x08000000, LENGTH = 4K
 	/* Reserve the last 8 bytes of RAM to save info across reboots */
-	ram (rwx) : ORIGIN = 0x20000000, LENGTH = 20480 - 8
+	ram (rwx) : ORIGIN = 0x20000000, LENGTH = 20k
 }
 
 /* Enforce emmition of the vector table. */
@@ -69,6 +69,7 @@ SECTIONS
 	end = .;
 }
 
-PROVIDE(_stack = ORIGIN(ram) + LENGTH(ram));
+PROVIDE(_stack = ORIGIN(ram) + LENGTH(ram) - 8);
+PROVIDE(_magic = ORIGIN(ram) + LENGTH(ram) - 8);
 
 
