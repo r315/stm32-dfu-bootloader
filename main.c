@@ -16,9 +16,9 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#include "flash_config.h"
 #include <string.h>
 #include "usb.h"
+#include "flash_config.h"
 #include "flash.h"
 #include "watchdog.h"
 #include "regs.h"
@@ -85,6 +85,14 @@ static int reboot_check_dfu(void) {
 	return (*(volatile uint64_t*)&_magic == *(volatile uint64_t*)&DFU_MAGIC_STR);
 }
 
+static void _full_system_reset() {
+    // Reset and wait for it!
+    volatile uint32_t *_scb_aircr = (uint32_t*)0xE000ED0CU;
+    *_scb_aircr = 0x05FA0000 | 0x4;
+    while(1);
+    __builtin_unreachable();
+}
+
 static void get_dev_unique_id(char *s) {
     volatile uint8_t *unique_id = (volatile uint8_t *)0x1FFFF7E8;
     /* Fetch serial number from chip's unique ID */
@@ -109,14 +117,6 @@ static uint8_t usbdfu_getstatus(uint32_t *bwPollTimeout) {
     default:
         return DFU_STATUS_OK;
     }
-}
-
-static void _full_system_reset() {
-    // Reset and wait for it!
-    volatile uint32_t *_scb_aircr = (uint32_t*)0xE000ED0CU;
-    *_scb_aircr = 0x05FA0000 | 0x4;
-    while(1);
-    __builtin_unreachable();
 }
 
 static void usbdfu_getstatus_complete(struct usb_setup_data *req) {

@@ -1,22 +1,24 @@
 
 // Flashing routines //
 
-#define FLASH_CR_LOCK  (1 << 7)
-#define FLASH_CR_STRT  (1 << 6)
-#define FLASH_CR_OPTER (1 << 5)
-#define FLASH_CR_OPTPG (1 << 4)
-#define FLASH_CR_PER   (1 << 1)
-#define FLASH_CR_PG   (1 << 0)
-#define FLASH_SR_BSY   (1 << 0)
-#define FLASH_KEYR    (*(volatile uint32_t*)0x40022004U)
-#define FLASH_OPTKEYR (*(volatile uint32_t*)0x40022008U)
-#define FLASH_SR      (*(volatile uint32_t*)0x4002200CU)
-#define FLASH_CR      (*(volatile uint32_t*)0x40022010U)
-#define FLASH_AR      (*(volatile uint32_t*)0x40022014U)
+#define FLASH_CR_LOCK   (1 << 7)
+#define FLASH_CR_STRT   (1 << 6)
+#define FLASH_CR_OPTER  (1 << 5)
+#define FLASH_CR_OPTPG  (1 << 4)
+#define FLASH_CR_PER    (1 << 1)
+#define FLASH_CR_PG     (1 << 0)
+#define FLASH_SR_BSY    (1 << 0)
+#define FLASH_KEYR      (*(volatile uint32_t*)0x40022004U)
+#define FLASH_OPTKEYR   (*(volatile uint32_t*)0x40022008U)
+#define FLASH_SR        (*(volatile uint32_t*)0x4002200CU)
+#define FLASH_CR        (*(volatile uint32_t*)0x40022010U)
+#define FLASH_AR        (*(volatile uint32_t*)0x40022014U)
+
+#define _flash_lock() FLASH_CR |= FLASH_CR_LOCK
+#define _flash_wait_for_last_operation() while(FLASH_SR & FLASH_SR_BSY)
 
 static void _flash_unlock(int opt) {
-	// Clear the unlock state.
-	FLASH_CR |= FLASH_CR_LOCK;
+	_flash_lock();
 
 	// Authorize the FPEC access.
 	FLASH_KEYR = 0x45670123U;
@@ -29,22 +31,16 @@ static void _flash_unlock(int opt) {
 	}
 }
 
-static void _flash_lock() {
-	FLASH_CR |= FLASH_CR_LOCK;
-}
-
-#define _flash_wait_for_last_operation() \
-	while (FLASH_SR & FLASH_SR_BSY);
-
 static void _flash_erase_page(uint32_t page_address) {
 	_flash_wait_for_last_operation();
-
+    // Enable page erase
 	FLASH_CR |= FLASH_CR_PER;
+
 	FLASH_AR = page_address;
 	FLASH_CR |= FLASH_CR_STRT;
-
 	_flash_wait_for_last_operation();
 
+    // Disable page erase
 	FLASH_CR &= ~FLASH_CR_PER;
 }
 
