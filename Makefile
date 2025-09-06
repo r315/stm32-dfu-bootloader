@@ -25,7 +25,7 @@ CONFIG ?= \
 -D_GPIO_DFU_BOOT_PIN=15 \
 -D$(HSE)
 
-CFLAGS =-Os -g -mcpu=cortex-m3 -mthumb -DSTM32F1 \
+CFLAGS =-Os -mcpu=cortex-m3 -mthumb -DSTM32F1 \
 	-std=c11 -Wall -Werror -Wextra -Wpedantic \
 	-ffunction-sections -fdata-sections -fno-builtin \
 	-DVERSION=\"$(GIT_VERSION)\" $(CONFIG)
@@ -36,17 +36,19 @@ LDFLAGS =-mcpu=cortex-m3 -mthumb \
 	-nostartfiles -nostdlib -lnosys \
 
 all: $(TARGET).elf
+	@$(SZ) -A -x $<
+	@$(SZ) -B $<
+
+bin: $(TARGET).bin
 
 # DFU bootloader firmware -Wl,-Ttext=$(FLASH_BASE_ADDR)
 %.elf: init.o main.o usb.o
 	@echo "[LD]" $@
 	@$(CC) $^ -o $@ -Tstm32f103.ld $(LDFLAGS)
-	$(SZ) -A $@
-	$(SZ) -B $@
 
 %.bin: %.elf
 	@echo "[OBJCOPY]" $@
-	$(OBJCOPY) -O binary $^ $@
+	@$(OBJCOPY) -O binary $^ $@
 
 %.o: %.c | flash_config.h
 	@echo "[CC]" $<
