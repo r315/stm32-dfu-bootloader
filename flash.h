@@ -14,7 +14,7 @@
 #define FLASH_CR        (*(volatile uint32_t*)0x40022010U)
 #define FLASH_AR        (*(volatile uint32_t*)0x40022014U)
 
-#define _flash_lock() FLASH_CR |= FLASH_CR_LOCK
+#define _flash_lock() FLASH_CR = FLASH_CR_LOCK
 #define _flash_wait_for_last_operation() while(FLASH_SR & FLASH_SR_BSY)
 
 static void _flash_unlock(int opt) {
